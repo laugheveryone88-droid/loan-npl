@@ -9,6 +9,10 @@ import {
   LIVE_OVERDUE_SPREADSHEET_ID,
 } from "@/lib/google-sheets";
 import { getGoogleServiceAccountAccessToken } from "@/lib/google-sheets-service-account";
+import {
+  getSheetHistorySourceFingerprint,
+  getSheetHistorySourcePayload,
+} from "@/lib/sheet-history-source";
 import { persistSheetSnapshot } from "@/lib/sheet-snapshot-history";
 import { loadSheetPaymentProgress } from "@/lib/sheet-payment-progress";
 import { createServerClient } from "@/lib/supabase";
@@ -260,22 +264,28 @@ export async function GET(request: Request) {
     payload.paymentProgress = { status: "unavailable", entries: [] };
   }
   const responseBody = JSON.stringify(payload);
-  const snapshotHash = createHash("sha256").update(responseBody).digest("hex");
+  const responseHash = createHash("sha256").update(responseBody).digest("hex");
   // Keep the last good snapshot as the baseline source when the baseline store
   // is temporarily unavailable. A retry must not silently reset the comparison.
   if (payload.paymentProgress.status === "unavailable") {
-    return sheetResponse(responseBody, snapshotHash, "unavailable", request.headers.get("if-none-match"));
+    return sheetResponse(responseBody, responseHash, "unavailable", request.headers.get("if-none-match"));
   }
-  const historyStatus = await persistSheetSnapshot({
-    supabase: auth.supabase,
-    userId: auth.userId,
-    payload,
-    snapshotHash,
-  }).catch(() => "unavailable" as const);
+  const historyPayload = getSheetHistorySourcePayload(payload);
+  const historyFingerprint = historyPayload
+    ? getSheetHistorySourceFingerprint(historyPayload)
+    : null;
+  const historyStatus = historyPayload && historyFingerprint
+    ? await persistSheetSnapshot({
+        supabase: auth.supabase,
+        userId: auth.userId,
+        payload: historyPayload,
+        snapshotHash: createHash("sha256").update(historyFingerprint).digest("hex"),
+      }).catch(() => "unavailable" as const)
+    : "unavailable" as const;
 
   return sheetResponse(
     responseBody,
-    snapshotHash,
+    responseHash,
     historyStatus,
     request.headers.get("if-none-match"),
   );

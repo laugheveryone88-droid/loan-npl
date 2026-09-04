@@ -236,7 +236,7 @@ export function SheetHistoryPanel({ refreshKey }: { refreshKey: string | null })
                 Өөрчлөлтийн түүх
               </CardTitle>
               <CardDescription>
-                Анхны Sheet болон түүнээс хойших өөрчлөлт бүрийг хугацаагаар хадгална. Хугацаа сонгоход тухайн үеийн KPI, бүх ангиллыг сонгоход хадгалсан хугацаануудын нийлбэр харагдана.
+                Google Sheet-ийн “Үндсэн” tab-ийн анхны төлөв болон түүнээс хойших өөрчлөлт бүрийг хугацаагаар хадгална. Хугацаа сонгоход тухайн үеийн KPI, бүх ангиллыг сонгоход хадгалсан хугацаануудын нийлбэр харагдана.
               </CardDescription>
             </div>
             <Badge variant="outline">{formatNumber(entries.length)} хадгалсан хугацаа</Badge>

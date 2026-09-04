@@ -87,9 +87,12 @@ flow exist.
   `Давхардсан харилцагч` for customers with two or more loan rows.
 - The detailed source-row list supports surname/name, phone, and CIF search through
   the shared dashboard filter. Each CIF cell shows the customer's grouped loan count.
-- The history tab starts with the first successfully read Sheet state and captures
-  every later changed state, including a return to an older state. Consecutive
-  identical reads are suppressed transactionally. Saved versions are grouped by
+- The history tab uses only the Google Sheet tab named `Үндсэн`. It starts with
+  that tab's first successfully read state and captures every later changed state,
+  including a return to an older state. Changes limited to other tabs do not create
+  history. Legacy multi-tab snapshots are projected and deduplicated by consecutive
+  `Үндсэн` states without deleting stored source data. Consecutive identical reads
+  are suppressed transactionally. Saved versions are grouped by
   capture date and update time. Selecting one time shows that snapshot's five main
   KPIs; `Бүх ангилал` sums those KPIs across every saved time. The history tab does
   not show a customer list or raw detailed Sheet rows.

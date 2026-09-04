@@ -7,6 +7,10 @@ import type {
   SheetSnapshotChangeSummary,
 } from "@/features/workbook-data/types";
 import { LIVE_OVERDUE_SPREADSHEET_ID } from "@/lib/google-sheets";
+import {
+  getSheetHistorySourceFingerprint,
+  getSheetHistorySourcePayload,
+} from "@/lib/sheet-history-source";
 import type { Database, Json } from "@/types/database";
 
 type SnapshotHistoryStatus = "captured" | "unchanged" | "unavailable";
@@ -99,7 +103,7 @@ export async function persistSheetSnapshot({
 }): Promise<SnapshotHistoryStatus> {
   const { data: previous, error: previousError } = await supabase
     .from("sheet_snapshot_history")
-    .select("id,snapshot_hash")
+    .select("id,snapshot_hash,payload")
     .eq("user_id", userId)
     .eq("spreadsheet_id", LIVE_OVERDUE_SPREADSHEET_ID)
     .order("captured_at", { ascending: false })
@@ -111,18 +115,15 @@ export async function persistSheetSnapshot({
   if (previous?.snapshot_hash === snapshotHash) return "unchanged";
 
   const stats = getPayloadStats(payload);
-  const { data: previousWithPayload, error: payloadError } = previous
-    ? await supabase
-        .from("sheet_snapshot_history")
-        .select("payload")
-        .eq("id", previous.id)
-        .eq("user_id", userId)
-        .maybeSingle()
-    : { data: null, error: null };
-  if (payloadError) return "unavailable";
-  const previousPayload = previousWithPayload?.payload
-    ? (previousWithPayload.payload as unknown as GoogleSheetsPayload)
+  const previousPayload = previous?.payload
+    ? getSheetHistorySourcePayload(previous.payload as unknown as GoogleSheetsPayload)
     : null;
+  if (
+    previousPayload &&
+    getSheetHistorySourceFingerprint(previousPayload) === getSheetHistorySourceFingerprint(payload)
+  ) {
+    return "unchanged";
+  }
   const { data: inserted, error: insertError } = await supabase
     .from("sheet_snapshot_history")
     .insert({
