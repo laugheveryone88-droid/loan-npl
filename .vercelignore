@@ -1,0 +1,20 @@
+# Exclude local data, credentials, generated builds, and test artifacts.
+private_source_data
+.env*
+*.pem
+node_modules
+.next*
+.vercel
+.test-artifacts
+.git
+.codex*
+.agents
+coverage
+out
+build
+tests
+/supabase/
+*.tsbuildinfo
+*.log
+AGENTS.md
+CLAUDE.md
