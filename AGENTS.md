@@ -87,6 +87,12 @@ flow exist.
   `Давхардсан харилцагч` for customers with two or more loan rows.
 - The detailed source-row list supports surname/name, phone, and CIF search through
   the shared dashboard filter. Each CIF cell shows the customer's grouped loan count.
+- The history tab starts with the first successfully read Sheet state and captures
+  every later changed state, including a return to an older state. Consecutive
+  identical reads are suppressed transactionally. Saved versions are grouped by
+  capture date and update time. Selecting one time shows that snapshot's five main
+  KPIs; `Бүх ангилал` sums those KPIs across every saved time. The history tab does
+  not show a customer list or raw detailed Sheet rows.
 - Current overdue KPIs: unique customers, customers with multiple loan rows,
   unpaid total payment amount, `Төлөгдөж байгаа`, and `Зөрчил арилгасан дүн`.
 - On desktop, the overview uses two rows: five main KPI cards followed by a
@@ -177,7 +183,7 @@ flow exist.
   least-privilege Google Sheets read-only service account. Its credentials must
   exist only in local/Vercel environment settings.
 - `src/app/api/google-sheets/history/` — authenticated, owner-scoped snapshot
-  history list and detail API.
+  history list, detail, and all-history KPI aggregate API.
 - `src/types/database.ts` — generated Supabase schema types, currently including
   `sheet_snapshot_history`.
 - Use the `@/` import alias for code under `src/`.

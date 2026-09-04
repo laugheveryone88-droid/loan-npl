@@ -103,6 +103,7 @@ export async function persistSheetSnapshot({
     .eq("user_id", userId)
     .eq("spreadsheet_id", LIVE_OVERDUE_SPREADSHEET_ID)
     .order("captured_at", { ascending: false })
+    .order("id", { ascending: false })
     .limit(1)
     .maybeSingle();
 
@@ -122,24 +123,21 @@ export async function persistSheetSnapshot({
   const previousPayload = previousWithPayload?.payload
     ? (previousWithPayload.payload as unknown as GoogleSheetsPayload)
     : null;
-  const { error: insertError } = await supabase
+  const { data: inserted, error: insertError } = await supabase
     .from("sheet_snapshot_history")
-    .upsert(
-      {
-        user_id: userId,
-        spreadsheet_id: LIVE_OVERDUE_SPREADSHEET_ID,
-        spreadsheet_title: payload.spreadsheetTitle,
-        snapshot_hash: snapshotHash,
-        row_count: stats.rowCount,
-        column_count: stats.columnCount,
-        change_summary: buildChangeSummary(payload, previousPayload) as unknown as Json,
-        payload: payload as unknown as Json,
-      },
-      {
-        onConflict: "user_id,spreadsheet_id,snapshot_hash",
-        ignoreDuplicates: true,
-      },
-    );
+    .insert({
+      user_id: userId,
+      spreadsheet_id: LIVE_OVERDUE_SPREADSHEET_ID,
+      spreadsheet_title: payload.spreadsheetTitle,
+      snapshot_hash: snapshotHash,
+      row_count: stats.rowCount,
+      column_count: stats.columnCount,
+      change_summary: buildChangeSummary(payload, previousPayload) as unknown as Json,
+      payload: payload as unknown as Json,
+    })
+    .select("id")
+    .maybeSingle();
 
-  return insertError ? "unavailable" : "captured";
+  if (insertError) return "unavailable";
+  return inserted ? "captured" : "unchanged";
 }

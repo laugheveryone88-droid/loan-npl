@@ -6,10 +6,11 @@ import type {
   SheetHistorySnapshot,
   SheetSnapshotChangeSummary,
 } from "@/features/workbook-data/types";
+import { summarizeSheetHistoryKpis } from "@/features/workbook-data/lib/sheet-history-kpis";
 import { LIVE_OVERDUE_SPREADSHEET_ID } from "@/lib/google-sheets";
 import { createServerClient } from "@/lib/supabase";
 
-const HISTORY_LIMIT = 100;
+const HISTORY_PAGE_SIZE = 100;
 
 function noStoreJson(body: unknown, init?: ResponseInit) {
   const response = NextResponse.json(body, init);
@@ -65,7 +66,38 @@ export async function GET(request: Request) {
     );
   }
 
-  const snapshotId = new URL(request.url).searchParams.get("id");
+  const searchParams = new URL(request.url).searchParams;
+  const snapshotId = searchParams.get("id");
+  if (searchParams.get("aggregate") === "all") {
+    const payloads: GoogleSheetsPayload[] = [];
+    let offset = 0;
+
+    while (true) {
+      const { data, error } = await supabase
+        .from("sheet_snapshot_history")
+        .select("payload")
+        .eq("user_id", userId)
+        .eq("spreadsheet_id", LIVE_OVERDUE_SPREADSHEET_ID)
+        .order("captured_at", { ascending: false })
+        .order("id", { ascending: false })
+        .range(offset, offset + HISTORY_PAGE_SIZE - 1);
+
+      if (error) {
+        return noStoreJson(
+          { code: "HISTORY_READ_ERROR", error: "Өөрчлөлтийн түүхийн нийлбэрийг уншиж чадсангүй." },
+          { status: 500 },
+        );
+      }
+
+      const page = data ?? [];
+      payloads.push(...page.map((row) => row.payload as unknown as GoogleSheetsPayload));
+      if (page.length < HISTORY_PAGE_SIZE) break;
+      offset += HISTORY_PAGE_SIZE;
+    }
+
+    return noStoreJson({ summary: summarizeSheetHistoryKpis(payloads) });
+  }
+
   if (snapshotId !== null) {
     if (!/^\d+$/.test(snapshotId)) {
       return noStoreJson(
@@ -102,20 +134,31 @@ export async function GET(request: Request) {
     return noStoreJson(snapshot);
   }
 
-  const { data, error } = await supabase
-    .from("sheet_snapshot_history")
-    .select("id,spreadsheet_title,captured_at,row_count,column_count,change_summary")
-    .eq("user_id", userId)
-    .eq("spreadsheet_id", LIVE_OVERDUE_SPREADSHEET_ID)
-    .order("captured_at", { ascending: false })
-    .limit(HISTORY_LIMIT);
+  const rows: Parameters<typeof toHistoryEntry>[0][] = [];
+  let offset = 0;
 
-  if (error) {
-    return noStoreJson(
-      { code: "HISTORY_READ_ERROR", error: "Өөрчлөлтийн түүхийг уншиж чадсангүй." },
-      { status: 500 },
-    );
+  while (true) {
+    const { data, error } = await supabase
+      .from("sheet_snapshot_history")
+      .select("id,spreadsheet_title,captured_at,row_count,column_count,change_summary")
+      .eq("user_id", userId)
+      .eq("spreadsheet_id", LIVE_OVERDUE_SPREADSHEET_ID)
+      .order("captured_at", { ascending: false })
+      .order("id", { ascending: false })
+      .range(offset, offset + HISTORY_PAGE_SIZE - 1);
+
+    if (error) {
+      return noStoreJson(
+        { code: "HISTORY_READ_ERROR", error: "Өөрчлөлтийн түүхийг уншиж чадсангүй." },
+        { status: 500 },
+      );
+    }
+
+    const page = data ?? [];
+    rows.push(...page);
+    if (page.length < HISTORY_PAGE_SIZE) break;
+    offset += HISTORY_PAGE_SIZE;
   }
 
-  return noStoreJson({ entries: (data ?? []).map(toHistoryEntry) });
+  return noStoreJson({ entries: rows.map(toHistoryEntry) });
 }

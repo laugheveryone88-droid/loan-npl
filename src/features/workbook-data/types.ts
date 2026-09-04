@@ -43,6 +43,24 @@ export type SheetHistorySnapshot = SheetHistoryEntry & {
   payload: GoogleSheetsPayload;
 };
 
+export type SheetHistoryKpiSummary = {
+  snapshotCount: number;
+  parsedSnapshotCount: number;
+  uniqueCustomers: number;
+  duplicatedCustomers: number;
+  unpaidAmount: number;
+  unpaidRows: number;
+  unpaidMissingAmounts: number;
+  resolvedAmount: number;
+  paidRows: number;
+  resolvedMissingAmounts: number;
+  paymentProgressAmount: number | null;
+  paymentProgressCustomerCount: number;
+  paymentProgressExcludedCustomers: number;
+  paymentProgressMissingCifRows: number;
+  paymentProgressUnavailableSnapshots: number;
+};
+
 export type GoogleSheetSummary = {
   title: string;
   loadedAt: string;
