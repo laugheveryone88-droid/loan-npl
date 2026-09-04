@@ -8,6 +8,14 @@ function normalizeSheetTitle(value: string) {
   return value.normalize("NFKC").trim().toLocaleLowerCase("mn-MN");
 }
 
+export function isSheetHistorySourcePayload(payload: GoogleSheetsPayload) {
+  return (
+    payload.sheets.length === 1 &&
+    normalizeSheetTitle(payload.sheets[0]?.title ?? "") ===
+      normalizeSheetTitle(SHEET_HISTORY_SOURCE_TITLE)
+  );
+}
+
 export function getSheetHistorySourcePayload(
   payload: GoogleSheetsPayload,
 ): GoogleSheetsPayload | null {

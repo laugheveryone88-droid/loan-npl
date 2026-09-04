@@ -12,6 +12,7 @@ import {
   getSheetHistorySourceFingerprint,
   getSheetHistorySourcePayload,
   getSheetHistorySourceStats,
+  isSheetHistorySourcePayload,
   SHEET_HISTORY_SOURCE_TITLE,
 } from "@/lib/sheet-history-source";
 import { createServerClient } from "@/lib/supabase";
@@ -107,7 +108,9 @@ async function loadCanonicalHistory(
   const canonical: CanonicalHistoryRow[] = [];
   let previousFingerprint: string | null = null;
   for (const row of rows) {
-    const payload = getSheetHistorySourcePayload(row.payload as GoogleSheetsPayload);
+    const storedPayload = row.payload as GoogleSheetsPayload;
+    if (!isSheetHistorySourcePayload(storedPayload)) continue;
+    const payload = getSheetHistorySourcePayload(storedPayload);
     const fingerprint = payload ? getSheetHistorySourceFingerprint(payload) : null;
     if (!payload || !fingerprint || fingerprint === previousFingerprint) continue;
     canonical.push({ row, payload });
@@ -160,7 +163,10 @@ export async function GET(request: Request) {
       );
     }
 
-    const sourcePayload = getSheetHistorySourcePayload(data.payload as unknown as GoogleSheetsPayload);
+    const storedPayload = data.payload as unknown as GoogleSheetsPayload;
+    const sourcePayload = isSheetHistorySourcePayload(storedPayload)
+      ? getSheetHistorySourcePayload(storedPayload)
+      : null;
     if (!sourcePayload) {
       return noStoreJson(
         { code: "HISTORY_SOURCE_NOT_FOUND", error: `Сонгосон түүхэнд “${SHEET_HISTORY_SOURCE_TITLE}” Sheet олдсонгүй.` },

@@ -10,6 +10,7 @@ import { LIVE_OVERDUE_SPREADSHEET_ID } from "@/lib/google-sheets";
 import {
   getSheetHistorySourceFingerprint,
   getSheetHistorySourcePayload,
+  isSheetHistorySourcePayload,
 } from "@/lib/sheet-history-source";
 import type { Database, Json } from "@/types/database";
 
@@ -112,12 +113,12 @@ export async function persistSheetSnapshot({
     .maybeSingle();
 
   if (previousError) return "unavailable";
-  if (previous?.snapshot_hash === snapshotHash) return "unchanged";
-
   const stats = getPayloadStats(payload);
-  const previousPayload = previous?.payload
-    ? getSheetHistorySourcePayload(previous.payload as unknown as GoogleSheetsPayload)
+  const rawPreviousPayload = previous?.payload as unknown as GoogleSheetsPayload | undefined;
+  const previousPayload = rawPreviousPayload && isSheetHistorySourcePayload(rawPreviousPayload)
+    ? getSheetHistorySourcePayload(rawPreviousPayload)
     : null;
+  if (previousPayload && previous?.snapshot_hash === snapshotHash) return "unchanged";
   if (
     previousPayload &&
     getSheetHistorySourceFingerprint(previousPayload) === getSheetHistorySourceFingerprint(payload)
