@@ -31,7 +31,7 @@ const pageTitles: Record<string, { title: string; description: string }> = {
   },
   "/overdue": {
     title: "Хугацаа хэтрэлт ба collection",
-    description: "DPD, үлдэгдэл, төлөлт, эрсдэлийн хяналт",
+    description: "Хугацаа хэтэрсэн хоног, үлдэгдэл, төлөлт, эрсдэлийн хяналт",
   },
   "/admin/users": {
     title: "Хэрэглэгчийн удирдлага",

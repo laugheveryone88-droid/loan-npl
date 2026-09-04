@@ -33,7 +33,7 @@ import {
   DistributionBars,
   MetricCard,
 } from "@/features/workbook-data/components/dashboard-primitives";
-import { formatMoney, formatNumber, maskIdentifier, maskPhone } from "@/features/workbook-data/lib/format";
+import { formatMoney, formatNumber, formatSheetHeader, maskIdentifier, maskPhone } from "@/features/workbook-data/lib/format";
 import { analyzeOverdueCustomers } from "@/features/workbook-data/lib/overdue-customer-analysis";
 import { summarizeResolvedPayments, summarizeUnpaidPayments } from "@/features/workbook-data/lib/resolved-payments";
 import { PaymentProgressMetric } from "@/features/workbook-data/components/payment-progress-metric";
@@ -68,7 +68,7 @@ function changeKindLabel(entry: SheetHistoryEntry) {
 }
 
 function dpdBucket(value: number | null) {
-  if (value === null) return "DPD тодорхойгүй";
+  if (value === null) return "Хугацаа хэтэрсэн хоног тодорхойгүй";
   if (value <= 5) return "0–5 хоног";
   if (value <= 10) return "6–10 хоног";
   if (value <= 30) return "11–30 хоног";
@@ -139,7 +139,7 @@ function HistoricalRawTable({ snapshot }: { snapshot: SheetHistorySnapshot }) {
                 <TableHead className="sticky left-0 bg-background">Мөр</TableHead>
                 {headers.map((header, index) => (
                   <TableHead key={`${header}:${index}`} className="min-w-40">
-                    {header}
+                    {formatSheetHeader(header)}
                   </TableHead>
                 ))}
               </TableRow>
@@ -207,7 +207,7 @@ function HistoricalDashboard({ snapshot }: { snapshot: SheetHistorySnapshot }) {
     "61–90 хоног",
     "91–180 хоног",
     "181+ хоног",
-    "DPD тодорхойгүй",
+    "Хугацаа хэтэрсэн хоног тодорхойгүй",
   ];
   const distribution = bucketLabels.map((label) => ({
     label,
@@ -228,7 +228,7 @@ function HistoricalDashboard({ snapshot }: { snapshot: SheetHistorySnapshot }) {
 
       {parsed ? (
         <section className="grid gap-6 xl:grid-cols-[minmax(0,0.7fr)_minmax(0,1.6fr)]">
-          <DistributionBars title="Тухайн үеийн DPD тархалт" description="CIF бүрийн хамгийн их DPD" items={distribution} />
+          <DistributionBars title="Тухайн үеийн хугацаа хэтэрсэн хоногийн тархалт" description="CIF бүрийн хугацаа хэтэрсэн хоногийн дээд утга" items={distribution} />
           <Card className="shadow-sm">
             <CardHeader>
               <CardTitle>Тухайн үеийн харилцагчийн жагсаалт</CardTitle>
@@ -242,7 +242,7 @@ function HistoricalDashboard({ snapshot }: { snapshot: SheetHistorySnapshot }) {
                       <TableHead>Харилцагч</TableHead>
                       <TableHead>Зээлийн мөр</TableHead>
                       <TableHead>Нийт төлбөрийн дүн (I)</TableHead>
-                      <TableHead>Хамгийн их DPD</TableHead>
+                      <TableHead>Хугацаа хэтэрсэн хоногийн дээд утга</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

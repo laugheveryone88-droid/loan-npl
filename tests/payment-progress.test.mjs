@@ -59,7 +59,7 @@ test("missing/invalid I amounts, missing CIF, and missing baselines are explicit
   assert.equal(summarizePaymentProgress({ status: "unavailable", entries: [] }, []), null);
 });
 
-test("decimal money stays exact and L/DPD/contact edits do not reset the baseline", () => {
+test("decimal money stays exact and L/overdue-day/contact edits do not reset the baseline", () => {
   const rows = [row("123", 100.30)];
   const baselines = baseline(parse(rows).records);
   rows[0][8] = 100.10;

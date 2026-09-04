@@ -14,6 +14,10 @@ export function formatMoney(value: number | null | undefined) {
     : "—";
 }
 
+export function formatSheetHeader(value: string) {
+  return value.replace(/\bDPD\b/giu, "Хугацаа хэтэрсэн хоног");
+}
+
 export function formatCompactNumber(value: number | null | undefined) {
   if (typeof value !== "number" || !Number.isFinite(value)) {
     return "—";

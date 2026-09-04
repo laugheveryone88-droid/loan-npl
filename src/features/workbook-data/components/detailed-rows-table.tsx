@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formatNumber, maskIdentifier, maskPhone } from "@/features/workbook-data/lib/format";
+import { formatNumber, formatSheetHeader, maskIdentifier, maskPhone } from "@/features/workbook-data/lib/format";
 import type { OverdueCustomerSummary } from "@/features/workbook-data/lib/overdue-customer-analysis";
 import { isPaidStatus } from "@/features/workbook-data/lib/resolved-payments";
 import type { OverdueLoanRecord } from "@/features/workbook-data/types";
@@ -50,7 +50,7 @@ export function DetailedRowsTable({ records, columns, customerByRecord, page, pa
       <TableHeader>
         <TableRow>
           {columns.map((header, index) => <TableHead key={index} className="min-w-36">
-            {columnLetter(index)} · {header}
+            {columnLetter(index)} · {formatSheetHeader(header)}
           </TableHead>)}
         </TableRow>
       </TableHeader>

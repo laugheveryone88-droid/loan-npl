@@ -33,7 +33,7 @@ export function groupCifPaymentTotals(records: OverdueLoanRecord[]): CifPaymentT
         if (!Number.isSafeInteger(cents)) valid = false;
       }
     }
-    // Row position, balance, DPD, and status can change without changing the loan.
+    // Row position, balance, overdue days, and status can change without changing the loan.
     // Without a loan ID, a changed multiset of origination details needs review;
     // deleting a loan must never look like a repayment of its entire balance.
     const loanSignature = JSON.stringify(rows.map((row) => JSON.stringify([

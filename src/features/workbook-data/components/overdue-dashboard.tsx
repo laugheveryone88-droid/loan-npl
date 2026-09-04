@@ -275,7 +275,7 @@ export function OverdueDashboard({ viewOnly = false }: { viewOnly?: boolean }) {
   ).length;
   const dpdDistribution = DPD_BUCKETS.map((bucket) => ({
     id: bucket,
-    label: bucket === "unknown" ? "DPD тодорхойгүй" : `${bucket} хоног`,
+    label: bucket === "unknown" ? "Хугацаа хэтэрсэн хоног тодорхойгүй" : `${bucket} хоног`,
     value: identityAndQueryCustomers.filter((customer) => getDpdBucket(customer.maximumDpd) === bucket).length,
     tone:
       bucket === "91-180" || bucket === "181+"
@@ -330,11 +330,11 @@ export function OverdueDashboard({ viewOnly = false }: { viewOnly?: boolean }) {
               setDetailPage(1);
             }}
           >
-            <SelectTrigger className="w-full" aria-label="DPD ангилал сонгох">
-              <SelectValue placeholder="DPD ангилал" />
+            <SelectTrigger className="w-full" aria-label="Хугацаа хэтэрсэн хоногийн ангилал сонгох">
+              <SelectValue placeholder="Хугацаа хэтэрсэн хоног" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Бүх DPD</SelectItem>
+              <SelectItem value="all">Хугацаа хэтэрсэн хоног</SelectItem>
               <SelectItem value="0-5">0–5 хоног</SelectItem>
               <SelectItem value="6-10">6–10 хоног</SelectItem>
               <SelectItem value="11-30">11–30 хоног</SelectItem>
@@ -342,7 +342,7 @@ export function OverdueDashboard({ viewOnly = false }: { viewOnly?: boolean }) {
               <SelectItem value="61-90">61–90 хоног</SelectItem>
               <SelectItem value="91-180">91–180 хоног</SelectItem>
               <SelectItem value="181+">181+ хоног</SelectItem>
-              <SelectItem value="unknown">DPD тодорхойгүй</SelectItem>
+              <SelectItem value="unknown">Хугацаа хэтэрсэн хоног тодорхойгүй</SelectItem>
             </SelectContent>
           </Select>
           <Select

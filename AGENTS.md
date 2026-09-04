@@ -69,8 +69,10 @@ flow exist.
 ## Dashboard vocabulary and metrics
 
 - NPL / чанаргүй зээл: a non-performing loan.
-- DPD / хэтэрсэн хоног: days past due.
-- DPD distribution buckets are non-overlapping: 0–5, 6–10, 11–30, 31–60,
+- User-visible days-past-due wording is `Хугацаа хэтэрсэн хоног`; never show the
+  `DPD` abbreviation in the interface. Internal identifiers and source compatibility
+  may continue to use DPD.
+- Хугацаа хэтэрсэн хоногийн distribution buckets are non-overlapping: 0–5, 6–10, 11–30, 31–60,
   61–90, 91–180, 181+, and unknown.
 - The main monetary summary and customer list use column I, `Нийт төлбөрийн дүн`.
 - The `Нийт төлбөрийн дүн` KPI sums I only for rows whose L (`Төлөв`) is not
@@ -79,7 +81,7 @@ flow exist.
   this KPI and includes it in `Зөрчил арилгасан дүн`. Historical KPI cards apply
   the same rule using each snapshot's statuses. Raw source/customer table amounts
   remain the original column I values.
-- DPD distribution rows are interactive filters for the detailed source-row
+- Хугацаа хэтэрсэн хоногийн distribution rows are interactive filters for the detailed source-row
   list, which is paginated 50 rows at a time.
 - The main KPI labels use `Давхардаагүй харилцагч` for CIF-grouped customers and
   `Давхардсан харилцагч` for customers with two or more loan rows.
@@ -88,11 +90,11 @@ flow exist.
 - Current overdue KPIs: unique customers, customers with multiple loan rows,
   unpaid total payment amount, `Төлөгдөж байгаа`, and `Зөрчил арилгасан дүн`.
 - On desktop, the overview uses two rows: five main KPI cards followed by a
-  horizontal row of the eight DPD customer buckets. Narrow screens wrap the cards
+  horizontal row of the eight overdue-day customer buckets. Narrow screens wrap the cards
   and buckets. The former `Шалгах харилцагч` KPI is removed; identity filters remain.
 - Main KPI cards show labels, values, and icons without footer descriptions;
   descriptions remain available on hover, including incomplete-data context.
-  The total payment icon uses `₮`. The DPD card has no explanatory subtitle, and
+  The total payment icon uses `₮`. The overdue-day card has no explanatory subtitle, and
   the shared filter panel is titled `Хайлт`.
 - `Зөрчил арилгасан дүн` sums column I (`Нийт төлбөрийн дүн`) only for individual
   rows whose `Төлөв` is `Төлсөн` (trimmed, Unicode normalized, case insensitive).
@@ -105,7 +107,7 @@ flow exist.
   current I total, 0). A higher observed I total raises the persisted comparison
   amount. 5m -> 7m -> 6m is 0 -> 0 -> 1m; then 5m is 2m, and a rebound to 6.5m
   reduces it to 0.5m. It does not add successive deltas. L status does not affect it.
-  Current shared CIF/DPD/search filters apply. Missing CIF/invalid amounts are
+  Current shared CIF/overdue-day/search filters apply. Missing CIF/invalid amounts are
   excluded with a partial-total warning. Changes in loan membership (multiset of
   origination date, original amount, maturity date) require review instead of
   treating added/deleted/replaced loans as repayments. Reordering rows is safe.
