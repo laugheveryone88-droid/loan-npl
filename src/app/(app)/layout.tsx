@@ -20,7 +20,7 @@ export default async function ProtectedAppLayout({ children }: { children: React
   const isAdmin = data.user.app_metadata?.role === "admin";
 
   return (
-    <GoogleSheetsDataProvider>
+    <GoogleSheetsDataProvider isAdmin={isAdmin}>
       <SidebarProvider>
         <AppSidebar isAdmin={isAdmin} />
         <SidebarInset>

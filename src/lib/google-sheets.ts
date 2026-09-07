@@ -12,8 +12,5 @@ export const LIVE_OVERDUE_SPREADSHEET_URL =
 
 export const LIVE_OVERDUE_SPREADSHEET_NAME = "Хугацаа хэтрэлт онтайм";
 
-export const LIVE_OVERDUE_SYNC_INTERVAL_MS = 60_000;
-export const LIVE_OVERDUE_SYNC_MAX_RETRY_MS = 120_000;
-
-export const LIVE_OVERDUE_SYNC_SCHEDULE_LABEL =
-  "Апп харагдаж байх үед бүх баганын өөрчлөлтийг 1 минут тутам автоматаар шалгана.";
+export const LIVE_OVERDUE_MANUAL_REFRESH_LABEL =
+  "Google Sheet-ийг зөвхөн админ “Одоо шинэчлэх” товчоор гараар шалгана.";

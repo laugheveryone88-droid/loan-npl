@@ -44,15 +44,13 @@ export async function loadSheetPaymentProgress({ supabase, userId, payload }: {
   })) {
     // Use the latest retained source when first enabling this metric, so a
     // change since the user's previous visit can still be measured.
-    const { data: previous, error } = await supabase.from("sheet_snapshot_history")
-      .select("payload,captured_at")
-      .eq("user_id", userId)
+    const { data: previous, error } = await supabase.from("sheet_current_state")
+      .select("payload,updated_at")
       .eq("spreadsheet_id", LIVE_OVERDUE_SPREADSHEET_ID)
-      .order("captured_at", { ascending: false }).order("id", { ascending: false })
-      .limit(1).maybeSingle();
+      .maybeSingle();
     if (error) throw new Error("Previous payment source unavailable.");
     if (previous) {
-      previousCapturedAt = previous.captured_at;
+      previousCapturedAt = previous.updated_at;
       try {
         previousTotals = groupCifPaymentTotals(parseOverdueGoogleSheet(previous.payload as unknown as GoogleSheetsPayload).records);
       } catch {

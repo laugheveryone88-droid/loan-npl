@@ -111,9 +111,9 @@ export function AppSidebar({ isAdmin = false }: { isAdmin?: boolean }) {
         <div className="rounded-lg bg-sidebar-accent p-3 text-xs text-sidebar-accent-foreground group-data-[collapsible=icon]:hidden">
           <p className="flex items-center gap-1.5 font-medium">
             <Database className="size-3.5" aria-hidden="true" />
-            Google Sheets шууд sync
+            Google Sheets хадгалсан өгөгдөл
           </p>
-          <p className="mt-1 text-muted-foreground">Хуудас нээгдэх бүрд A–K мэдээллийг автоматаар уншина.</p>
+          <p className="mt-1 text-muted-foreground">Админ гараар шинэчлэх үед “Үндсэн” шийтийг уншина.</p>
         </div>
       </SidebarFooter>
       <SidebarRail />

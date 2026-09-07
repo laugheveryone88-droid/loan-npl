@@ -44,10 +44,10 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   source column. It groups customers by normalized CIF, provides metrics, a read-only
   source table (50 rows per page), and immutable history. L (`Төлөв`) is read from
   the Sheet; date, status, and notes are edited only in Google Sheets. All columns,
-  including newly added or unnamed columns, appear automatically. Source refreshes
-  on load, every minute after a completed request while visible and online,
-  and on focus, visibility, or connectivity restoration. Errors back off to two
-  minutes; in-flight requests are deduplicated and cancelled on unmount.
+  including newly added or unnamed columns, appear after an administrator manually
+  presses `Одоо шинэчлэх`. Opening or focusing the app and connectivity changes do
+  not read Google Sheets. All authenticated users read the latest published database
+  copy; only an administrator can publish a new copy.
 - `/admin/users` — server-protected administrator-only user management. It
   lists Supabase Auth users and supports create, name/role/password update, and
   confirmed deletion through a JWT-protected Edge Function. Passwords are
@@ -56,7 +56,8 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   administrator cannot demote or delete their own account.
 - `/dashboard` — protected, standalone view-only presentation of the live
   Google Sheets dashboard. It removes the main application sidebar and detailed
-  source-row work tab while preserving filters, main metrics, and automatic refresh.
+  source-row work tab while preserving filters and main metrics from the latest
+  administrator-published copy.
 - Unknown routes use the Mongolian `not-found.tsx` page.
 
 The main application sidebar links to `/overdue` as **Үндсэн цэс**. The standalone
@@ -88,10 +89,10 @@ flow exist.
 - The detailed source-row list supports surname/name, phone, and CIF search through
   the shared dashboard filter. Each CIF cell shows the customer's grouped loan count.
 - The history tab uses only the Google Sheet tab named `Үндсэн`. It starts with
-  the current state captured after the source-only history cutover and records every later changed state,
+  the retained state captured at 2026-09-04 17:21:17 Asia/Ulaanbaatar and records
+  each later state only when an administrator manually refreshes and the source changed,
   including a return to an older state. Changes limited to other tabs do not create
-  history. Legacy multi-tab snapshots remain stored but are excluded from the visible
-  history and KPI aggregate. Consecutive identical reads
+  history. Prior later snapshots were removed at the manual-refresh cutover. Consecutive identical reads
   are suppressed transactionally. Saved versions are grouped by
   capture date and update time. Selecting one time shows that snapshot's five main
   KPIs; `Бүх ангилал` sums those KPIs across every saved time. The history tab does
@@ -172,12 +173,12 @@ flow exist.
   state, dashboard/history components, and CIF-based unique-customer analysis.
 - `src/lib/supabase/` — browser client, server client, environment parsing, and
   session utilities.
-- `src/app/api/google-sheets/overdue/` — authenticated server-side adapter that
-  reads the full available column range from the configured Google Sheet, stores
-  a new immutable snapshot when its content hash changes, and returns JSON rows for
-  the dashboard parser. Its GET method uses
-  a server service account when configured, with user OAuth as a fallback. It
-  never writes back to Google Sheets.
+- `src/app/api/google-sheets/overdue/` — authenticated server-side adapter. GET
+  returns the latest published Supabase copy without contacting Google. Admin-only
+  POST reads the full available column range from the configured Google Sheet using
+  a server service account when configured, with user OAuth as a fallback, and
+  publishes a new copy and immutable history snapshot only when `Үндсэн` changed.
+  It never writes back to Google Sheets.
 - `src/lib/sheet-payment-progress.ts` — initializes original CIF baselines, raises
   comparison maxima, and calculates progress on each authenticated Sheet read, before ETag and snapshot
   persistence. Baseline storage failure leaves the last good snapshot intact and
@@ -219,16 +220,13 @@ flow exist.
 - Protected dashboards and Google Sheets APIs validate the current user with
   Supabase Auth on each request so deleted or banned accounts do not retain
   application access through a locally valid JWT.
-- Google Sheet source snapshots are stored in the owner-scoped,
-  RLS-protected `sheet_snapshot_history` table only when the content hash changes.
-  Snapshots are immutable from application roles and preserve all source columns
-  for time-based review. The overdue dashboard also holds the current parsed rows
-  in browser memory and refreshes all columns on page load and every minute
-  while visible/online, plus focus and connectivity restoration. This is polling,
-  not a push subscription or a background ingestion job when the app is closed.
-  Service-account reads share a ten-second process-local cache and in-flight
-  request; authentication and owner-scoped snapshot persistence still run per request.
-  OAuth fallback reads are never shared between users.
+- The latest published Sheet copy is stored in the RLS-protected
+  `sheet_current_state` table and is readable by authenticated users. Only an admin
+  JWT may insert or update it. Published source snapshots are stored in
+  `sheet_snapshot_history` only when `Үндсэн` changes; authenticated users may read
+  them and only admins may insert them. The dashboard loads the database copy once
+  on page load and performs no polling, focus, connectivity, morning, daytime, or
+  evening refresh. Google is contacted only by an admin-only manual POST.
   The snapshot schema is managed by versioned migrations with least-privilege
   grants and generated `src/types/database.ts` types.
 - `sheet_payment_baselines` is owner-scoped with RLS, SELECT/INSERT and column-level

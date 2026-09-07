@@ -47,7 +47,7 @@ import {
 } from "@/features/workbook-data/lib/overdue-customer-analysis";
 import {
   LIVE_OVERDUE_SPREADSHEET_URL,
-  LIVE_OVERDUE_SYNC_SCHEDULE_LABEL,
+  LIVE_OVERDUE_MANUAL_REFRESH_LABEL,
 } from "@/lib/google-sheets";
 
 type DpdBucket =
@@ -116,9 +116,11 @@ function formatSyncTime(value: string | null) {
 function LiveDatabaseStatus({
   sync,
   onRefresh,
+  canRefresh,
 }: {
   sync: LiveOverdueSyncState;
   onRefresh: () => Promise<void>;
+  canRefresh: boolean;
 }) {
   const isSyncing = sync.status === "syncing" || sync.status === "idle";
   const isReady = sync.status === "ready";
@@ -130,9 +132,9 @@ function LiveDatabaseStatus({
         ? Database
         : TriangleAlert;
   const label = isSyncing
-    ? "Шинэчилж байна"
+    ? "Уншиж байна"
     : isReady
-      ? "Шууд холбогдсон"
+      ? "Хадгалсан өгөгдөл"
       : sync.status === "auth-required"
         ? "Google эрх шаардлагатай"
         : "Sync алдаа";
@@ -163,22 +165,24 @@ function LiveDatabaseStatus({
           {sync.error
             ? sync.error
             : isReady
-              ? `${LIVE_OVERDUE_SYNC_SCHEDULE_LABEL}${lastChecked ? ` Сүүлд шалгасан: ${lastChecked}.` : ""}`
-              : "Хугацаа хэтрэлтийн мэдээллийг Google Sheets-ээс уншиж байна."}
+              ? `${LIVE_OVERDUE_MANUAL_REFRESH_LABEL}${lastChecked ? ` Сүүлд гараар шалгасан: ${lastChecked}.` : ""}`
+              : "Хугацаа хэтрэлтийн хадгалсан мэдээллийг уншиж байна."}
         </p>
         {sync.historyWarning ? <p className="text-amber-700 dark:text-amber-300">{sync.historyWarning}</p> : null}
         {lastUpdated ? <p>Самбарын өгөгдөл сүүлд шинэчлэгдсэн: {lastUpdated}.</p> : null}
         <div className="mt-3 flex flex-wrap gap-2">
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            disabled={isSyncing}
-            onClick={() => void onRefresh()}
-          >
-            <RefreshCw className={isSyncing ? "animate-spin" : undefined} aria-hidden="true" />
-            Одоо шинэчлэх
-          </Button>
+          {canRefresh ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={isSyncing}
+              onClick={() => void onRefresh()}
+            >
+              <RefreshCw className={isSyncing ? "animate-spin" : undefined} aria-hidden="true" />
+              Одоо шинэчлэх
+            </Button>
+          ) : null}
           <Button asChild size="sm" variant="ghost">
             <a href={LIVE_OVERDUE_SPREADSHEET_URL} target="_blank" rel="noreferrer">
               Эх Google Sheet нээх
@@ -213,7 +217,7 @@ function customerMatchesQuery(customer: OverdueCustomerSummary, query: string) {
 }
 
 export function OverdueDashboard({ viewOnly = false }: { viewOnly?: boolean }) {
-  const { overdueData, liveOverdueSync, refreshLiveOverdue } = useGoogleSheetsData();
+  const { overdueData, liveOverdueSync, canRefresh, refreshLiveOverdue } = useGoogleSheetsData();
   const [dpdFilter, setDpdFilter] = React.useState<DpdBucket>("all");
   const [identityFilter, setIdentityFilter] = React.useState<IdentityFilter>("all");
   const [query, setQuery] = React.useState("");
@@ -253,7 +257,11 @@ export function OverdueDashboard({ viewOnly = false }: { viewOnly?: boolean }) {
           eyebrow={viewOnly ? "Зөвхөн харах горим" : "Google Sheets самбар"}
           title="Хугацаа хэтрэлт ба харилцагч"
         />
-        <LiveDatabaseStatus sync={liveOverdueSync} onRefresh={refreshLiveOverdue} />
+        <LiveDatabaseStatus
+          sync={liveOverdueSync}
+          onRefresh={refreshLiveOverdue}
+          canRefresh={canRefresh && !viewOnly}
+        />
         <DataUnavailable
           title={
             liveOverdueSync.status === "auth-required"
@@ -262,7 +270,7 @@ export function OverdueDashboard({ viewOnly = false }: { viewOnly?: boolean }) {
                 ? "Google Sheets өгөгдөл ачаалагдсангүй"
                 : "Google Sheets өгөгдлийг уншиж байна"
           }
-          description="Google эрх эсвэл серверийн service account тохиргоо бэлэн болмогц энэ хуудас Sheet-ийн бүх баганын мэдээллийг автоматаар дахин уншина."
+          description="Админ “Одоо шинэчлэх” товчоор Google Sheet-ийг амжилттай уншсаны дараа хадгалсан мэдээлэл энд харагдана."
         />
       </DashboardPage>
     );
@@ -293,10 +301,14 @@ export function OverdueDashboard({ viewOnly = false }: { viewOnly?: boolean }) {
         <DashboardHeading
           eyebrow={viewOnly ? "Шууд дашбоард" : "Google Sheets самбар"}
           title={viewOnly ? "Зээлийн эрсдэлийн нэгдсэн тойм" : "Хугацаа хэтрэлт ба харилцагч"}
-          badge={`Шууд sync · ${formatNumber(overdueData.records.length)} мөр`}
+          badge={`Хадгалсан өгөгдөл · ${formatNumber(overdueData.records.length)} мөр`}
         />
 
-      <LiveDatabaseStatus sync={liveOverdueSync} onRefresh={refreshLiveOverdue} />
+      <LiveDatabaseStatus
+        sync={liveOverdueSync}
+        onRefresh={refreshLiveOverdue}
+        canRefresh={canRefresh && !viewOnly}
+      />
 
       <Alert
         className={
@@ -456,7 +468,7 @@ export function OverdueDashboard({ viewOnly = false }: { viewOnly?: boolean }) {
                 <div>
                   <CardTitle>Google Sheet-ийн дэлгэрэнгүй лист</CardTitle>
                   <CardDescription>
-                    Бүх баганын мэдээлэл Sheet-ээс автоматаар шинэчлэгдэнэ. Төлөв, огноо, тайлбараа эх Google Sheet дээр засварлана.
+                    Админ гараар шинэчлэх үед бүх баганын мэдээллийг Sheet-ээс уншина. Төлөв, огноо, тайлбараа эх Google Sheet дээр засварлана.
                   </CardDescription>
                 </div>
                 <Badge variant="outline">{formatNumber(filteredRecords.length)} мөр</Badge>

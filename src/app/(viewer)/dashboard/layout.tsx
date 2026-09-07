@@ -32,7 +32,7 @@ export default async function DashboardViewerLayout({ children }: { children: Re
                 </p>
                 <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
                   <Database className="size-3.5" aria-hidden="true" />
-                  <span>Google Sheets шууд өгөгдөл</span>
+                  <span>Google Sheets хадгалсан өгөгдөл</span>
                 </div>
               </div>
             </div>

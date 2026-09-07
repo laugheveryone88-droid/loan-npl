@@ -82,7 +82,6 @@ function toHistoryEntry(row: HistoryRow, payload: GoogleSheetsPayload): SheetHis
 
 async function loadCanonicalHistory(
   supabase: Awaited<ReturnType<typeof createServerClient>>,
-  userId: string,
 ) {
   const rows: HistoryRow[] = [];
   let offset = 0;
@@ -91,7 +90,6 @@ async function loadCanonicalHistory(
     const { data, error } = await supabase
       .from("sheet_snapshot_history")
       .select("id,spreadsheet_title,captured_at,row_count,column_count,change_summary,payload")
-      .eq("user_id", userId)
       .eq("spreadsheet_id", LIVE_OVERDUE_SPREADSHEET_ID)
       .order("captured_at", { ascending: true })
       .order("id", { ascending: true })
@@ -146,7 +144,6 @@ export async function GET(request: Request) {
       .from("sheet_snapshot_history")
       .select("id,spreadsheet_title,captured_at,row_count,column_count,change_summary,payload")
       .eq("id", Number(snapshotId))
-      .eq("user_id", userId)
       .eq("spreadsheet_id", LIVE_OVERDUE_SPREADSHEET_ID)
       .maybeSingle();
 
@@ -182,7 +179,7 @@ export async function GET(request: Request) {
     return noStoreJson(snapshot);
   }
 
-  const history = await loadCanonicalHistory(supabase, userId);
+  const history = await loadCanonicalHistory(supabase);
   if (history.error || !history.rows) {
     return noStoreJson(
       { code: "HISTORY_READ_ERROR", error: "Өөрчлөлтийн түүхийг уншиж чадсангүй." },

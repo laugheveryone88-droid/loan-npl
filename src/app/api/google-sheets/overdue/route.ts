@@ -12,18 +12,15 @@ import { getGoogleServiceAccountAccessToken } from "@/lib/google-sheets-service-
 import {
   getSheetHistorySourceFingerprint,
   getSheetHistorySourcePayload,
+  getSheetHistorySourceStats,
 } from "@/lib/sheet-history-source";
 import { persistSheetSnapshot } from "@/lib/sheet-snapshot-history";
 import { loadSheetPaymentProgress } from "@/lib/sheet-payment-progress";
 import { createServerClient } from "@/lib/supabase";
+import type { Json } from "@/types/database";
 
 const MAX_SHEETS = 50;
 const MAX_RESPONSE_BYTES = 25 * 1024 * 1024;
-// Share only service-account reads within one server instance. User OAuth reads
-// are never served from this cache; each caller still passes Supabase Auth first.
-let cachedServiceRead: { body: string; expiresAt: number } | null = null;
-let serviceReadInFlight: Promise<string | Response> | null = null;
-
 type GoogleSheetMetadata = {
   properties?: { title?: string };
   sheets?: Array<{
@@ -39,7 +36,11 @@ async function getAuthenticatedContext() {
   const { data, error } = await supabase.auth.getUser();
   const userId = data.user?.id;
   if (error || !userId) return null;
-  return { supabase, userId };
+  return {
+    supabase,
+    userId,
+    isAdmin: data.user.app_metadata?.role === "admin",
+  };
 }
 
 async function getUserGoogleAccessToken() {
@@ -57,7 +58,7 @@ async function googleFetch(url: string, accessToken: string) {
 function googleErrorResponse(status: number) {
   if (status === 429) {
     return NextResponse.json(
-      { code: "GOOGLE_RATE_LIMIT", error: "Google Sheets-ийн унших хязгаарт хүрлээ. Түр хүлээгээд автоматаар дахин шалгана." },
+      { code: "GOOGLE_RATE_LIMIT", error: "Google Sheets-ийн унших хязгаарт хүрлээ. Түр хүлээгээд дахин оролдоно уу." },
       { status: 429, headers: { "Retry-After": "60" } },
     );
   }
@@ -174,25 +175,12 @@ async function readGoogleSheet(accessToken: string) {
   return body;
 }
 
-async function readServiceAccountSheet(accessToken: string) {
-  if (cachedServiceRead && cachedServiceRead.expiresAt > Date.now()) return cachedServiceRead.body;
-  if (!serviceReadInFlight) {
-    const startedAt = Date.now();
-    serviceReadInFlight = readGoogleSheet(accessToken).then((result) => {
-      if (typeof result === "string") {
-        cachedServiceRead = { body: result, expiresAt: startedAt + 10_000 };
-      }
-      return result;
-    }).finally(() => { serviceReadInFlight = null; });
-  }
-  const result = await serviceReadInFlight;
-  return result instanceof Response ? result.clone() : result;
-}
-
 function sheetResponse(
   body: string,
   snapshotHash: string,
-  historyStatus: "captured" | "unchanged" | "unavailable",
+  updatedAt: string,
+  historyStatus?: "captured" | "unchanged" | "unavailable",
+  changed?: boolean,
   ifNoneMatch?: string | null,
 ) {
   const etag = `"${snapshotHash}"`;
@@ -200,7 +188,9 @@ function sheetResponse(
     "Cache-Control": "private, no-cache, no-store, max-age=0, must-revalidate",
     "Content-Type": "application/json; charset=utf-8",
     ETag: etag,
-    "X-Sheet-History": historyStatus,
+    "X-Sheet-Updated-At": updatedAt,
+    ...(historyStatus ? { "X-Sheet-History": historyStatus } : {}),
+    ...(typeof changed === "boolean" ? { "X-Sheet-Changed": String(changed) } : {}),
   };
 
   if (ifNoneMatch === etag) {
@@ -219,11 +209,53 @@ export async function GET(request: Request) {
     );
   }
 
+  const { data: current, error } = await auth.supabase
+    .from("sheet_current_state")
+    .select("payload,snapshot_hash,updated_at")
+    .eq("spreadsheet_id", LIVE_OVERDUE_SPREADSHEET_ID)
+    .maybeSingle();
+
+  if (error) {
+    return NextResponse.json(
+      { code: "SAVED_SHEET_READ_ERROR", error: "Хадгалсан Sheet өгөгдлийг уншиж чадсангүй." },
+      { status: 500 },
+    );
+  }
+  if (!current) {
+    return NextResponse.json(
+      { code: "SAVED_SHEET_NOT_FOUND", error: "Админ Google Sheet өгөгдлийг анх удаа шинэчлэх шаардлагатай." },
+      { status: 503 },
+    );
+  }
+
+  return sheetResponse(
+    JSON.stringify(current.payload),
+    current.snapshot_hash,
+    current.updated_at,
+    undefined,
+    undefined,
+    request.headers.get("if-none-match"),
+  );
+}
+
+export async function POST() {
+  const auth = await getAuthenticatedContext();
+  if (!auth) {
+    return NextResponse.json(
+      { code: "UNAUTHENTICATED", error: "Эхлээд системд нэвтэрнэ үү." },
+      { status: 401 },
+    );
+  }
+  if (!auth.isAdmin) {
+    return NextResponse.json(
+      { code: "ADMIN_REQUIRED", error: "Google Sheet өгөгдлийг зөвхөн админ шинэчилнэ." },
+      { status: 403 },
+    );
+  }
+
   let accessToken: string | null;
-  let usesServiceAccount = false;
   try {
     accessToken = await getGoogleServiceAccountAccessToken();
-    usesServiceAccount = Boolean(accessToken);
     accessToken ??= await getUserGoogleAccessToken();
   } catch {
     return NextResponse.json(
@@ -244,12 +276,10 @@ export async function GET(request: Request) {
 
   let body: string | Response;
   try {
-    body = usesServiceAccount
-      ? await readServiceAccountSheet(accessToken)
-      : await readGoogleSheet(accessToken);
+    body = await readGoogleSheet(accessToken);
   } catch {
     return NextResponse.json(
-      { code: "GOOGLE_SHEETS_UNAVAILABLE", error: "Google Sheets-тэй холбогдож чадсангүй. Автоматаар дахин шалгана." },
+      { code: "GOOGLE_SHEETS_UNAVAILABLE", error: "Google Sheets-тэй холбогдож чадсангүй. Дахин оролдоно уу." },
       { status: 502 },
     );
   }
@@ -263,30 +293,73 @@ export async function GET(request: Request) {
   } catch {
     payload.paymentProgress = { status: "unavailable", entries: [] };
   }
-  const responseBody = JSON.stringify(payload);
-  const responseHash = createHash("sha256").update(responseBody).digest("hex");
-  // Keep the last good snapshot as the baseline source when the baseline store
-  // is temporarily unavailable. A retry must not silently reset the comparison.
-  if (payload.paymentProgress.status === "unavailable") {
-    return sheetResponse(responseBody, responseHash, "unavailable", request.headers.get("if-none-match"));
-  }
   const historyPayload = getSheetHistorySourcePayload(payload);
   const historyFingerprint = historyPayload
     ? getSheetHistorySourceFingerprint(historyPayload)
     : null;
-  const historyStatus = historyPayload && historyFingerprint
-    ? await persistSheetSnapshot({
-        supabase: auth.supabase,
-        userId: auth.userId,
-        payload: historyPayload,
-        snapshotHash: createHash("sha256").update(historyFingerprint).digest("hex"),
-      }).catch(() => "unavailable" as const)
-    : "unavailable" as const;
+  if (!historyPayload || !historyFingerprint || payload.paymentProgress.status === "unavailable") {
+    return NextResponse.json(
+      { code: "SHEET_REFRESH_INCOMPLETE", error: "Шинэ өгөгдлийг бүрэн тооцоолж чадсангүй. Хадгалсан хувилбар өөрчлөгдөөгүй." },
+      { status: 503 },
+    );
+  }
+
+  const snapshotHash = createHash("sha256").update(historyFingerprint).digest("hex");
+  const { data: current, error: currentError } = await auth.supabase
+    .from("sheet_current_state")
+    .select("payload,snapshot_hash,updated_at")
+    .eq("spreadsheet_id", LIVE_OVERDUE_SPREADSHEET_ID)
+    .maybeSingle();
+  if (currentError) {
+    return NextResponse.json(
+      { code: "SAVED_SHEET_READ_ERROR", error: "Хадгалсан Sheet өгөгдлийг уншиж чадсангүй." },
+      { status: 500 },
+    );
+  }
+
+  if (current?.snapshot_hash === snapshotHash) {
+    return sheetResponse(
+      JSON.stringify(current.payload),
+      current.snapshot_hash,
+      current.updated_at,
+      "unchanged",
+      false,
+    );
+  }
+
+  const updatedAt = new Date().toISOString();
+  const stats = getSheetHistorySourceStats(historyPayload);
+  const { error: publishError } = await auth.supabase
+    .from("sheet_current_state")
+    .upsert({
+      spreadsheet_id: LIVE_OVERDUE_SPREADSHEET_ID,
+      spreadsheet_title: historyPayload.spreadsheetTitle,
+      snapshot_hash: snapshotHash,
+      payload: historyPayload as unknown as Json,
+      row_count: stats.rowCount,
+      column_count: stats.columnCount,
+      updated_at: updatedAt,
+      updated_by: auth.userId,
+    });
+  if (publishError) {
+    return NextResponse.json(
+      { code: "SHEET_PUBLISH_ERROR", error: "Шинэ Sheet өгөгдлийг аппд хадгалж чадсангүй." },
+      { status: 500 },
+    );
+  }
+
+  const historyStatus = await persistSheetSnapshot({
+    supabase: auth.supabase,
+    userId: auth.userId,
+    payload: historyPayload,
+    snapshotHash,
+  }).catch(() => "unavailable" as const);
 
   return sheetResponse(
-    responseBody,
-    responseHash,
+    JSON.stringify(historyPayload),
+    snapshotHash,
+    updatedAt,
     historyStatus,
-    request.headers.get("if-none-match"),
+    true,
   );
 }

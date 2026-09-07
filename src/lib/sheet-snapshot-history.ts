@@ -105,7 +105,6 @@ export async function persistSheetSnapshot({
   const { data: previous, error: previousError } = await supabase
     .from("sheet_snapshot_history")
     .select("id,snapshot_hash,payload")
-    .eq("user_id", userId)
     .eq("spreadsheet_id", LIVE_OVERDUE_SPREADSHEET_ID)
     .order("captured_at", { ascending: false })
     .order("id", { ascending: false })

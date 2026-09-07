@@ -7,7 +7,6 @@ import type {
   GoogleSheetsPayload,
   OverdueSheetData,
 } from "@/features/workbook-data/types";
-import { LIVE_OVERDUE_SYNC_INTERVAL_MS, LIVE_OVERDUE_SYNC_MAX_RETRY_MS } from "@/lib/google-sheets";
 
 export type LiveOverdueSyncState = {
   status: "idle" | "syncing" | "ready" | "auth-required" | "error";
@@ -20,6 +19,7 @@ export type LiveOverdueSyncState = {
 type GoogleSheetsDataContextValue = {
   overdueData: OverdueSheetData | null;
   liveOverdueSync: LiveOverdueSyncState;
+  canRefresh: boolean;
   refreshLiveOverdue: () => Promise<void>;
 };
 
@@ -38,62 +38,46 @@ const initialLiveSyncState: LiveOverdueSyncState = {
 
 const GoogleSheetsDataContext = React.createContext<GoogleSheetsDataContextValue | null>(null);
 
-export function GoogleSheetsDataProvider({ children }: { children: React.ReactNode }) {
+export function GoogleSheetsDataProvider({
+  children,
+  isAdmin = false,
+}: {
+  children: React.ReactNode;
+  isAdmin?: boolean;
+}) {
   const [overdueData, setOverdueData] = React.useState<OverdueSheetData | null>(null);
   const [liveOverdueSync, setLiveOverdueSync] =
     React.useState<LiveOverdueSyncState>(initialLiveSyncState);
-  const etagRef = React.useRef<string | null>(null);
   const inFlightRef = React.useRef<Promise<void> | null>(null);
   const abortControllerRef = React.useRef<AbortController | null>(null);
-  const retryDelayRef = React.useRef(LIVE_OVERDUE_SYNC_INTERVAL_MS);
 
-  const refreshLiveOverdue = React.useCallback(() => {
+  const requestOverdueData = React.useCallback((manualRefresh: boolean) => {
     if (inFlightRef.current) return inFlightRef.current;
 
     const request = (async () => {
       setLiveOverdueSync((current) => ({ ...current, status: "syncing", error: null }));
-
       const controller = new AbortController();
       abortControllerRef.current = controller;
 
       try {
-        const headers = new Headers();
-        if (etagRef.current) headers.set("If-None-Match", etagRef.current);
-
         const response = await fetch("/api/google-sheets/overdue", {
-          method: "GET",
-          headers,
+          method: manualRefresh ? "POST" : "GET",
           cache: "no-store",
           signal: AbortSignal.any([controller.signal, AbortSignal.timeout(30_000)]),
         });
         if (controller.signal.aborted) return;
-        const checkedAt = new Date().toISOString();
-        const historyWarning = response.headers.get("X-Sheet-History") === "unavailable"
-          ? "Одоогийн өгөгдөл шинэчлэгдсэн боловч өөрчлөлтийн түүхийг хадгалж чадсангүй. Дараагийн шалгалтаар дахин оролдоно."
-          : null;
 
-        if (response.status === 304) {
-          retryDelayRef.current = LIVE_OVERDUE_SYNC_INTERVAL_MS;
-          setLiveOverdueSync((current) => ({
-            ...current,
-            status: "ready",
-            lastCheckedAt: checkedAt,
-            error: null,
-            historyWarning,
-          }));
-          return;
-        }
-
+        const checkedAt = manualRefresh ? new Date().toISOString() : null;
         if (!response.ok) {
           const payload = (await response.json().catch(() => ({}))) as ErrorPayload;
           if (controller.signal.aborted) return;
-          retryDelayRef.current = Math.min(retryDelayRef.current * 2, LIVE_OVERDUE_SYNC_MAX_RETRY_MS);
-          if (response.status === 429) retryDelayRef.current = Math.max(retryDelayRef.current, 60_000);
           setLiveOverdueSync((current) => ({
             ...current,
-            status: payload.code === "GOOGLE_RECONNECT" || payload.code === "UNAUTHENTICATED" ? "auth-required" : "error",
-            lastCheckedAt: checkedAt,
-            error: payload.error ?? "Google Sheets өгөгдлийг шинэчилж чадсангүй.",
+            status: payload.code === "GOOGLE_RECONNECT" || payload.code === "UNAUTHENTICATED"
+              ? "auth-required"
+              : "error",
+            lastCheckedAt: checkedAt ?? current.lastCheckedAt,
+            error: payload.error ?? "Хадгалсан Google Sheets өгөгдлийг уншиж чадсангүй.",
           }));
           return;
         }
@@ -101,27 +85,28 @@ export function GoogleSheetsDataProvider({ children }: { children: React.ReactNo
         const payload = (await response.json()) as GoogleSheetsPayload;
         if (controller.signal.aborted) return;
         const parsed = parseOverdueGoogleSheet(payload);
-        retryDelayRef.current = LIVE_OVERDUE_SYNC_INTERVAL_MS;
-        etagRef.current = response.headers.get("etag");
+        const updatedAt = response.headers.get("X-Sheet-Updated-At");
+        const historyWarning = response.headers.get("X-Sheet-History") === "unavailable"
+          ? "Самбарын өгөгдөл шинэчлэгдсэн боловч өөрчлөлтийн түүхийг хадгалж чадсангүй."
+          : null;
+
         setOverdueData(parsed);
-        setLiveOverdueSync({
+        setLiveOverdueSync((current) => ({
           status: "ready",
-          lastCheckedAt: checkedAt,
-          lastUpdatedAt: checkedAt,
+          lastCheckedAt: checkedAt ?? current.lastCheckedAt,
+          lastUpdatedAt: updatedAt ?? current.lastUpdatedAt,
           error: null,
           historyWarning,
-        });
-      } catch (syncError) {
+        }));
+      } catch (requestError) {
         if (controller.signal.aborted) return;
-        retryDelayRef.current = Math.min(retryDelayRef.current * 2, LIVE_OVERDUE_SYNC_MAX_RETRY_MS);
-
         setLiveOverdueSync((current) => ({
           ...current,
           status: "error",
-          lastCheckedAt: new Date().toISOString(),
-          error: syncError instanceof Error && syncError.name === "TimeoutError"
-            ? "Google Sheets-ийн хариу удаж байна. Автоматаар дахин шалгана."
-            : "Google Sheets өгөгдлийг шинэчлэх үед алдаа гарлаа. Автоматаар дахин шалгана.",
+          lastCheckedAt: manualRefresh ? new Date().toISOString() : current.lastCheckedAt,
+          error: requestError instanceof Error && requestError.name === "TimeoutError"
+            ? "Google Sheets-ийн хариу удаж байна. Дахин оролдоно уу."
+            : "Google Sheets өгөгдлийг унших үед алдаа гарлаа.",
         }));
       }
     })();
@@ -133,38 +118,27 @@ export function GoogleSheetsDataProvider({ children }: { children: React.ReactNo
     return request;
   }, []);
 
+  const refreshLiveOverdue = React.useCallback(() => {
+    if (!isAdmin) return Promise.resolve();
+    return requestOverdueData(true);
+  }, [isAdmin, requestOverdueData]);
+
   React.useEffect(() => {
-    let disposed = false;
-    let timeoutId: number | undefined;
-    const check = () => {
-      window.clearTimeout(timeoutId);
-      if (disposed || document.visibilityState === "hidden" || !navigator.onLine) return;
-      void refreshLiveOverdue().finally(() => {
-        if (disposed) return;
-        window.clearTimeout(timeoutId);
-        timeoutId = window.setTimeout(check, retryDelayRef.current);
-      });
-    };
-
-    check();
-    document.addEventListener("visibilitychange", check);
-    window.addEventListener("focus", check);
-    window.addEventListener("online", check);
-
+    void requestOverdueData(false);
     return () => {
-      disposed = true;
-      window.clearTimeout(timeoutId);
-      document.removeEventListener("visibilitychange", check);
-      window.removeEventListener("focus", check);
-      window.removeEventListener("online", check);
       abortControllerRef.current?.abort();
       inFlightRef.current = null;
     };
-  }, [refreshLiveOverdue]);
+  }, [requestOverdueData]);
 
   const value = React.useMemo(
-    () => ({ overdueData, liveOverdueSync, refreshLiveOverdue }),
-    [overdueData, liveOverdueSync, refreshLiveOverdue],
+    () => ({
+      overdueData,
+      liveOverdueSync,
+      canRefresh: isAdmin,
+      refreshLiveOverdue,
+    }),
+    [isAdmin, overdueData, liveOverdueSync, refreshLiveOverdue],
   );
 
   return (

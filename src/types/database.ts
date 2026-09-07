@@ -87,6 +87,39 @@ export type Database = {
         }
         Relationships: []
       }
+      sheet_current_state: {
+        Row: {
+          column_count: number
+          payload: Json
+          row_count: number
+          snapshot_hash: string
+          spreadsheet_id: string
+          spreadsheet_title: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          column_count?: number
+          payload: Json
+          row_count?: number
+          snapshot_hash: string
+          spreadsheet_id: string
+          spreadsheet_title: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          column_count?: number
+          payload?: Json
+          row_count?: number
+          snapshot_hash?: string
+          spreadsheet_id?: string
+          spreadsheet_title?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       sheet_snapshot_history: {
         Row: {
           captured_at: string;

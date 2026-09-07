@@ -27,7 +27,7 @@ type SiteHeaderProps = {
 const pageTitles: Record<string, { title: string; description: string }> = {
   "/": {
     title: "Loan NPL ажлын орчин",
-    description: "Google Sheets шууд өгөгдөл ба самбарын төлөв",
+    description: "Google Sheets хадгалсан өгөгдөл ба самбарын төлөв",
   },
   "/overdue": {
     title: "Хугацаа хэтрэлт ба collection",

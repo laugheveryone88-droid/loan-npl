@@ -22,11 +22,11 @@ import { useGoogleSheetsData } from "@/features/workbook-data/components/google-
 import { formatNumber } from "@/features/workbook-data/lib/format";
 import {
   LIVE_OVERDUE_SPREADSHEET_URL,
-  LIVE_OVERDUE_SYNC_SCHEDULE_LABEL,
+  LIVE_OVERDUE_MANUAL_REFRESH_LABEL,
 } from "@/lib/google-sheets";
 
 export function WorkspaceOverview() {
-  const { overdueData, liveOverdueSync, refreshLiveOverdue } = useGoogleSheetsData();
+  const { overdueData, liveOverdueSync, canRefresh, refreshLiveOverdue } = useGoogleSheetsData();
   const isSyncing = liveOverdueSync.status === "idle" || liveOverdueSync.status === "syncing";
   const isReady = liveOverdueSync.status === "ready";
   const StatusIcon = isSyncing ? RefreshCw : isReady ? CheckCircle2 : TriangleAlert;
@@ -36,8 +36,8 @@ export function WorkspaceOverview() {
       <DashboardHeading
         eyebrow="Google Sheets өгөгдлийн сан"
         title="Хугацаа хэтрэлтийн шууд хяналт"
-        description={`Апп нээгдэх бүрд тохируулсан Google Sheet-ийн бүх баганыг автоматаар уншина. ${LIVE_OVERDUE_SYNC_SCHEDULE_LABEL}`}
-        badge="1 минут тутмын автомат шинэчлэлт"
+        description={LIVE_OVERDUE_MANUAL_REFRESH_LABEL}
+        badge="Админы гар шинэчлэлт"
       />
 
       <Card className={isReady ? "border-emerald-600/25 shadow-sm" : "shadow-sm"}>
@@ -60,10 +60,12 @@ export function WorkspaceOverview() {
           </span>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" disabled={isSyncing} onClick={() => void refreshLiveOverdue()}>
-            <RefreshCw className={isSyncing ? "animate-spin" : undefined} aria-hidden="true" />
-            Одоо шинэчлэх
-          </Button>
+          {canRefresh ? (
+            <Button type="button" variant="outline" disabled={isSyncing} onClick={() => void refreshLiveOverdue()}>
+              <RefreshCw className={isSyncing ? "animate-spin" : undefined} aria-hidden="true" />
+              Одоо шинэчлэх
+            </Button>
+          ) : null}
           <Button asChild variant="ghost">
             <a href={LIVE_OVERDUE_SPREADSHEET_URL} target="_blank" rel="noreferrer">
               <Database aria-hidden="true" />
